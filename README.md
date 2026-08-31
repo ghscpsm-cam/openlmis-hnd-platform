@@ -1,0 +1,110 @@
+# OpenLMIS HND Platform
+
+Orquestador de la instalación OpenLMIS de Honduras. Proporciona **un solo comando `./platform`**
+para administrar OpenLMIS sin tener que recordar los comandos internos de Docker Compose.
+
+> Capa 1 (este repo) = plataforma/infra + backup/restore/reset. Capa 2 = `openlmis-seeder`
+> (datos maestros). Capa 3 = `openlmis-importer` (transacciones, diferida). Ver `PLAN.md`.
+
+## Modelo: orquesta el ref-distro existente
+
+Platform **no trae su propio compose**: invoca el `docker-compose` del ref-distro que ya
+corre en `REFDISTRO_DIR` (`/opt/openlmis-ref-distro`), y agrega encima seed / backup / restore /
+reset. Así no duplica ni reemplaza el deployment actual.
+
+Platform también carga un override versionado (`overrides/openlmis-ref-distro.yml`) encima del
+compose del ref-distro. Esto permite repetir los ajustes operacionales de Honduras sin editar a
+mano cada servidor.
+
+La configuración actual usa la UI oficial `openlmis/reference-ui:5.2.12`. No contiene un fork de
+la UI ni traducciones propias: el español se activa con `LOCALE=es` y las traducciones incluidas
+en OpenLMIS. Las correcciones o textos específicos de Honduras deberán versionarse en un futuro
+repositorio `openlmis-hnd-ui` y publicarse como una imagen inmutable.
+
+## Uso
+
+```bash
+./platform up dev                 # levanta OpenLMIS y espera que responda
+./platform status dev             # estado de servicios + OpenLMIS
+./platform seed dev               # siembra datos maestros (capa 2)
+./platform db-fixes dev           # aplica fixes SQL idempotentes de plataforma
+./platform backup dev             # pg_dump → backups/
+./platform restore dev backups/dev_20260622-1200.dump --confirm
+./platform baseline dev           # captura el baseline limpio (1 vez, pg_dump)
+./platform reset dev --confirm    # restaura baseline LIMPIO, NO siembra (~2.6 min)
+./platform down dev               # detiene servicios (sin borrar datos)
+```
+
+`<env>` ∈ `{dev, test}` (prod no permitido). Los comandos destructivos exigen `--confirm`.
+
+## Pruebas en limpio (`reset`) — baseline-por-dump (rápido y confiable)
+
+Flujo recomendado para iterar en dev (**~2.6 min**, probado):
+
+1. **Una sola vez** — llevá OpenLMIS al estado "limpio" que quieras y capturalo:
+   `platform baseline dev` (es un `pg_dump`, segundos). Ese dump queda en `baselines/<env>_baseline.dump`.
+2. **Cada vez que quieras limpio** — `platform reset dev --confirm`: restaura el baseline y deja
+   OpenLMIS **completamente limpio** (NO siembra). Hace un backup de seguridad automático antes.
+3. **Cuando quieras datos** — `platform seed dev` (manual, aparte): cargás el set que quieras.
+
+El costo de ~2.6 min es casi todo el **reinicio de los servicios de OpenLMIS** (inherente; el
+`pg_restore` es de segundos). El procedimiento manual equivalente tiene el mismo costo.
+
+> ⚠️ **`baseline-rebuild` (migración fresca desde cero) NO se recomienda**: en este deployment es
+> lento (~40 min) y frágil (la migración inicial de OpenLMIS choca con obstáculos del entorno —
+> postgis y otros). Para "limpio rápido" usá un **baseline-por-dump** (`baseline` + `reset`),
+> no la migración fresca. El dump de postgres es un *bind mount* (`./data`), por eso `down -v`
+> no lo vacía.
+
+> `backup`/`restore` son la herramienta general de snapshot/recuperación de la BD (pg_dump/pg_restore).
+
+## Fixes de plataforma
+
+`platform` aplica fixes SQL idempotentes desde `db-fixes/*.sql`. Se ejecutan automáticamente después
+de `up`, `seed`, `restore`, `reset` y `baseline-rebuild`; también se pueden correr manualmente:
+
+```bash
+./platform db-fixes dev
+```
+
+Cada archivo SQL se ejecuta por separado para soportar operaciones como `CREATE INDEX CONCURRENTLY`.
+El fix actual agrega el índice `referencedata.price_changes(programorderableid)`, necesario para
+evitar que `/api/orderables` tarde decenas de segundos cuando hay muchos `program_orderables`.
+
+## Configuración
+
+```bash
+cp env/dev.env.example env/dev.env     # ajustar REFDISTRO_DIR, creds de seed, etc.
+```
+
+`env/*.env` no se versiona (solo los `.example`). Los dumps (`backups/`, `baselines/`) tampoco.
+
+Antes de levantar cada instancia, el archivo `/opt/openlmis-ref-distro/settings.env` debe contener
+la configuración regional correspondiente:
+
+```env
+LOCALE=es
+COUNTRY=HN
+CURRENCY_CODE=HNL
+CURRENCY_SYMBOL=L
+CURRENCY_LOCALE=HN
+TIME_ZONE=America/Tegucigalpa
+```
+
+Los dominios instalados actualmente son:
+
+- DEV: `http://hnd-dev.openlmiscam.org`
+- TEST: `http://hnd.openlmiscam.org`
+
+Los archivos `.env`, contraseñas, logs, backups y baselines nunca deben subirse al repositorio.
+
+## Estructura
+```
+platform                 # dispatcher (único entrypoint)
+lib/common.sh            # helpers (env, compose del ref-distro, db, waits)
+lib/commands.sh          # up/down/status/logs/seed/backup/restore/baseline/reset
+overrides/               # overrides docker compose aplicados por platform
+db-fixes/                # SQL idempotente aplicado por platform
+env/{dev,test}.env.example
+baselines/  backups/  logs/   # gitignored
+```

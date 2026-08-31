@@ -1,0 +1,23 @@
+services:
+  reference-ui:
+    image: "${REFERENCE_UI_IMAGE:-openlmis/reference-ui:5.2.12}"
+    volumes: !reset []
+    environment:
+      LOCALE: "${LOCALE:-es}"
+      COUNTRY: "${COUNTRY:-HN}"
+      CURRENCY_CODE: "${CURRENCY_CODE:-HNL}"
+      CURRENCY_SYMBOL: "${CURRENCY_SYMBOL:-L}"
+      CURRENCY_LOCALE: "${CURRENCY_LOCALE:-HN}"
+      TIME_ZONE: "${TIME_ZONE:-America/Tegucigalpa}"
+  referencedata:
+    environment:
+      JAVA_OPTS: "-server -Xmx${REFERENCEDATA_XMX:-1536m} -Dlogging.config=/config/log/logback.xml"
+    mem_limit: "${REFERENCEDATA_MEM_LIMIT:-2G}"
+    cpus: "${REFERENCEDATA_CPUS:-2}"
+  stockmanagement:
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: "-server -Xmx${STOCKMANAGEMENT_XMX:-1536m} -Dlogging.config=/config/log/logback.xml"
+      spring_profiles_active: production
+    mem_limit: "${STOCKMANAGEMENT_MEM_LIMIT:-2G}"
+    cpus: "${STOCKMANAGEMENT_CPUS:-2}"
