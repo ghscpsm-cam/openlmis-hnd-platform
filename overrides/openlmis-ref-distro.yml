@@ -1,4 +1,7 @@
 services:
+  nginx:
+    environment:
+      CLIENT_MAX_BODY_SIZE: "${CLIENT_MAX_BODY_SIZE:-50m}"
   reference-ui:
     image: "${REFERENCE_UI_IMAGE:-openlmis/reference-ui:5.2.12}"
     volumes: !reset []
