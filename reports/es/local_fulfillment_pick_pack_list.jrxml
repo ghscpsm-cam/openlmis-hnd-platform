@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.20.5.final using JasperReports Library version 6.20.5-3efcf2e67f959db3888d79f73dde2dbd7acb4f8e  -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="LocalFulfillmentPickPackList" pageWidth="842" pageHeight="595" whenNoDataType="AllSectionsNoDetail" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" whenResourceMissingType="Empty" uuid="be52f660-1499-4fdb-bac0-fa964fc1e938">
+	<property name="net.sf.jasperreports.export.xls.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.csv.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.xls.one.page.per.sheet" value="false"/>
+	<property name="net.sf.jasperreports.export.csv.one.page.per.sheet" value="false"/>
+	<property name="net.sf.jasperreports.export.xls.remove.empty.space.between.rows" value="true"/>
+	<property name="net.sf.jasperreports.export.csv.remove.empty.space.between.rows" value="true"/>
+	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w1" value="337"/>
+	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w2" value="654"/>
+	<property name="com.jaspersoft.studio.property.dataset.dialog.DatasetDialog.sash.w1" value="685"/>
+	<property name="com.jaspersoft.studio.property.dataset.dialog.DatasetDialog.sash.w2" value="302"/>
+	<import value="java.time.LocalDate"/>
+	<import value="java.time.format.DateTimeFormatter"/>
+	<import value="java.time.ZonedDateTime"/>
+	<import value="java.text.DecimalFormat"/>
+	<style name="Table_CH" mode="Opaque" backcolor="#BFE1FF">
+		<box>
+			<pen lineWidth="0.5" lineColor="#000000"/>
+			<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+		</box>
+	</style>
+	<style name="Table_TD" mode="Opaque" backcolor="#FFFFFF">
+		<box>
+			<pen lineWidth="0.5" lineColor="#000000"/>
+			<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+			<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+		</box>
+	</style>
+	<subDataset name="OrderDataset" uuid="e483d003-bc92-44dd-ae47-a6036ec805c8">
+		<property name="com.jaspersoft.studio.data.defaultdataadapter" value="core/local_core.xml"/>
+		<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
+		<parameter name="dateFormat" isForPrompting="false"/>
+		<parameter name="shipmentDraftId"/>
+		<queryString language="plsql">
+			<![CDATA[SELECT
+	o.orderCode AS orderCode,
+	rf.name AS requestingFacilityName,
+	sf.name AS supplyingFacilityName
+FROM
+	fulfillment.shipment_drafts AS d
+	INNER JOIN fulfillment.orders AS o ON d.orderId = o.id
+	INNER JOIN referencedata.facilities AS rf ON o.requestingFacilityId = rf.id
+	INNER JOIN referencedata.facilities AS sf ON o.supplyingFacilityId = sf.id
+WHERE
+	d.id = $P{shipmentDraftId}::uuid]]>
+		</queryString>
+		<field name="orderCode"/>
+		<field name="requestingFacilityName"/>
+		<field name="supplyingFacilityName"/>
+	</subDataset>
+	<parameter name="shipmentDraftId">
+		<property name="displayName" value="ID del borrador de envío"/>
+	</parameter>
+	<parameter name="decimalFormat" class="java.text.DecimalFormat" isForPrompting="false"/>
+	<parameter name="dateFormat" isForPrompting="false"/>
+	<queryString language="plsql">
+		<![CDATA[SELECT DISTINCT orderProductCode, orderProductName, productCode, productName, netContent, filledQuantity, lotCode, expirationDate, vvmStatus
+FROM (
+SELECT
+  order_orderable.code as orderProductCode,
+  order_orderable.fullproductname as orderProductName,
+  orderable.code as productCode,
+  orderable.fullproductname as productName,
+  orderable.netContent as netContent,
+  shipment_li.quantityshipped as filledQuantity,
+  lot.lotcode as lotCode,
+  lot.expirationDate as expirationDate,
+  stock_card_li.extraData->>'vvmStatus' as vvmStatus
+FROM
+  fulfillment.shipment_drafts shipment
+  JOIN
+  fulfillment.orders ord
+    ON ord.id = shipment.orderid
+  JOIN
+  fulfillment.shipment_draft_line_items shipment_li
+    ON shipment_li.shipmentdraftid = shipment.id
+  JOIN
+  referencedata.orderables orderable
+    ON orderable.id = shipment_li.orderableid
+    AND orderable.versionnumber = shipment_li.orderableversionnumber
+  JOIN
+  referencedata.dispensables dispensable
+    ON dispensable.id = orderable.dispensableid
+  JOIN
+  fulfillment.order_line_items order_li
+    ON order_li.orderid = shipment.orderid AND order_li.orderableid = shipment_li.orderableid AND shipment_li.orderableversionnumber = order_li.orderableversionnumber
+  LEFT JOIN
+  referencedata.lots lot
+    ON shipment_li.lotid = lot.id
+  JOIN
+  referencedata.orderables order_orderable
+    ON order_orderable.id = order_li.orderableid
+    AND order_orderable.versionnumber = order_li.orderableversionnumber
+  JOIN
+  stockmanagement.stock_cards stock_card
+    ON (stock_card.facilityId = ord.supplyingFacilityId AND stock_card.programId = ord.programId AND shipment_li.orderableId = stock_card.orderableId AND ((shipment_li.lotId IS NULL AND stock_card.lotId IS NULL) OR shipment_li.lotId = stock_card.lotId))
+  JOIN
+  stockmanagement.stock_card_line_items stock_card_li
+    ON stock_card_li.stockCardId = stock_card.id
+WHERE
+  shipment.id = $P{shipmentDraftId}::uuid
+  AND shipment_li.quantityshipped > 0
+  AND stock_card_li.id IN
+  (SELECT id
+   FROM stockmanagement.stock_card_line_items
+   WHERE stockCardId = stock_card.id
+   ORDER BY occurredDate DESC NULLS LAST, processedDate DESC NULLS LAST
+   LIMIT 1)
+UNION ALL
+SELECT
+  order_orderable.code as orderProductCode,
+  order_orderable.fullproductname as orderProductName,
+  orderable.code as productCode,
+  orderable.fullproductname as productName,
+  orderable.netContent as netContent,
+  shipment_li.quantityshipped as filledQuantity,
+  lot.lotcode as lotCode,
+  lot.expirationDate as expirationDate,
+  stock_card_li.extraData->>'vvmStatus' as vvmStatus
+FROM
+  fulfillment.shipment_drafts shipment
+  JOIN
+  fulfillment.orders ord
+    ON ord.id = shipment.orderid
+  JOIN
+  fulfillment.shipment_draft_line_items shipment_li
+    ON shipment_li.shipmentdraftid = shipment.id
+  JOIN
+  referencedata.orderables orderable
+    ON orderable.id = shipment_li.orderableid
+    AND orderable.versionnumber = shipment_li.orderableversionnumber
+  JOIN
+  referencedata.dispensables dispensable
+    ON dispensable.id = orderable.dispensableid
+  JOIN referencedata.orderable_identifiers shipment_orderable_identifier ON orderable.id = shipment_orderable_identifier.orderableid
+                                                       AND (shipment_orderable_identifier.key = 'tradeItem' OR shipment_orderable_identifier.key = 'commodityType')
+  JOIN
+  fulfillment.order_line_items order_li
+    ON order_li.orderid = shipment.orderid AND order_li.orderableid = shipment_li.orderableid
+	AND order_li.orderableid IN (
+        SELECT o.id
+        FROM referencedata.orderables o
+        LEFT JOIN referencedata.orderable_identifiers order_orderable_identifier
+          ON o.id = order_orderable_identifier.orderableid
+        LEFT JOIN referencedata.trade_items trade_item
+          ON order_orderable_identifier.value::uuid = trade_item.id
+        LEFT JOIN referencedata.commodity_types commodity_type
+          ON order_orderable_identifier.value::uuid = commodity_type.id
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM referencedata.dispensable_attributes orderer_dispensable_attribute
+          JOIN referencedata.dispensable_attributes shipment_dispensable_attribute
+            ON shipment_dispensable_attribute.dispensableid = orderer_dispensable_attribute.dispensableid
+          WHERE orderer_dispensable_attribute.key = shipment_dispensable_attribute.key
+            AND orderer_dispensable_attribute.value <> shipment_dispensable_attribute.value
+        )
+        AND (
+          shipment_orderable_identifier.value::uuid = trade_item.id
+          OR shipment_orderable_identifier.value::uuid = commodity_type.id
+        )
+      )
+  LEFT JOIN
+  referencedata.lots lot
+    ON shipment_li.lotid = lot.id
+  JOIN
+  referencedata.orderables order_orderable
+    ON order_orderable.id = order_li.orderableid
+    AND order_orderable.versionnumber = order_li.orderableversionnumber
+  JOIN
+  stockmanagement.stock_cards stock_card
+    ON (stock_card.facilityId = ord.supplyingFacilityId AND stock_card.programId = ord.programId AND shipment_li.orderableId = stock_card.orderableId AND ((shipment_li.lotId IS NULL AND stock_card.lotId IS NULL) OR shipment_li.lotId = stock_card.lotId))
+  JOIN
+  stockmanagement.stock_card_line_items stock_card_li
+    ON stock_card_li.stockCardId = stock_card.id
+WHERE
+  shipment.id = $P{shipmentDraftId}::uuid
+  AND shipment_li.quantityshipped > 0
+  AND stock_card_li.id IN
+  (SELECT id
+   FROM stockmanagement.stock_card_line_items
+   WHERE stockCardId = stock_card.id
+   ORDER BY occurredDate DESC NULLS LAST, processedDate DESC NULLS LAST
+   LIMIT 1)
+) tmp
+ORDER BY
+  orderProductCode ASC,
+  productCode ASC,
+  expirationDate ASC NULLS FIRST,
+  vvmStatus DESC NULLS LAST,
+  lotCode desc]]>
+	</queryString>
+	<field name="productCode" class="java.lang.String"/>
+	<field name="productName" class="java.lang.String"/>
+	<field name="orderProductCode" class="java.lang.String"/>
+	<field name="orderProductName" class="java.lang.String"/>
+	<field name="netContent" class="java.lang.Long"/>
+	<field name="lotCode" class="java.lang.String"/>
+	<field name="expirationDate" class="java.lang.String"/>
+	<field name="vvmStatus" class="java.lang.String"/>
+	<field name="filledQuantity" class="java.lang.Long"/>
+	<variable name="filledQuantityDoses" class="java.lang.Long">
+		<variableExpression><![CDATA[$F{filledQuantity} * $F{netContent}]]></variableExpression>
+	</variable>
+	<variable name="sumFilledQuantityDoses" class="java.lang.Long" resetType="Group" resetGroup="ProductGroup" calculation="Sum">
+		<variableExpression><![CDATA[$V{filledQuantityDoses}]]></variableExpression>
+		<initialValueExpression><![CDATA[0L]]></initialValueExpression>
+	</variable>
+	<variable name="sumFilledQuantity" class="java.lang.Long" resetType="Group" resetGroup="ProductGroup" calculation="Sum">
+		<variableExpression><![CDATA[$F{filledQuantity}]]></variableExpression>
+		<initialValueExpression><![CDATA[0L]]></initialValueExpression>
+	</variable>
+	<group name="OrderProductGroup" keepTogether="true">
+		<groupExpression><![CDATA[$F{orderProductName}]]></groupExpression>
+		<groupHeader>
+			<band height="30">
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<frame>
+					<reportElement mode="Opaque" x="0" y="0" width="802" height="30" backcolor="#DDDDDD" uuid="a084c0f9-9783-467c-9b59-5e7128f30dc0"/>
+					<box>
+						<topPen lineWidth="0.5"/>
+						<bottomPen lineWidth="0.5"/>
+					</box>
+					<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+						<reportElement x="129" y="0" width="150" height="30" uuid="a123b79a-45c2-4dfa-b17a-1fb24e91bc5c"/>
+						<box>
+							<topPen lineWidth="1.0"/>
+						</box>
+						<textElement textAlignment="Center" verticalAlignment="Middle"/>
+						<textFieldExpression><![CDATA[$F{orderProductName}]]></textFieldExpression>
+					</textField>
+					<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+						<reportElement x="-1" y="0" width="130" height="30" uuid="c0448d36-ff6d-4d65-a4de-765540d681fa"/>
+						<box>
+							<topPen lineWidth="1.0"/>
+						</box>
+						<textElement textAlignment="Center" verticalAlignment="Middle"/>
+						<textFieldExpression><![CDATA[$F{orderProductCode}]]></textFieldExpression>
+					</textField>
+				</frame>
+			</band>
+		</groupHeader>
+	</group>
+	<group name="ProductGroup" keepTogether="true">
+		<groupExpression><![CDATA[$F{productName}]]></groupExpression>
+		<groupHeader>
+			<band height="30">
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<printWhenExpression><![CDATA[$F{lotCode} != null]]></printWhenExpression>
+				<frame>
+					<reportElement x="0" y="0" width="802" height="30" uuid="aa26c1a3-89f8-4c52-951e-0295d062488c"/>
+					<box>
+						<bottomPen lineWidth="0.5"/>
+					</box>
+					<textField isStretchWithOverflow="true" evaluationTime="Group" evaluationGroup="ProductGroup" isBlankWhenNull="false">
+						<reportElement x="550" y="0" width="127" height="30" uuid="d5c3dd3e-eab9-417d-8bc3-ea9753d06ed1"/>
+						<textElement textAlignment="Center" verticalAlignment="Middle"/>
+						<textFieldExpression><![CDATA[$V{sumFilledQuantityDoses} == null ? 0 : $P{decimalFormat}.format($V{sumFilledQuantityDoses}).toString()]]></textFieldExpression>
+					</textField>
+					<textField isStretchWithOverflow="true" evaluationTime="Group" evaluationGroup="ProductGroup" isBlankWhenNull="false">
+						<reportElement x="677" y="0" width="125" height="30" uuid="7941fdc6-1a22-41ef-b4bf-ee02d5d78136"/>
+						<textElement textAlignment="Center" verticalAlignment="Middle"/>
+						<textFieldExpression><![CDATA[$V{sumFilledQuantity} == null ? 0 : $P{decimalFormat}.format($V{sumFilledQuantity}).toString()]]></textFieldExpression>
+					</textField>
+					<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+						<reportElement x="130" y="0" width="150" height="30" uuid="45d213d8-f881-40c5-b90f-d29e1e9d1f55"/>
+						<textElement textAlignment="Center" verticalAlignment="Middle"/>
+						<textFieldExpression><![CDATA[$F{productName}]]></textFieldExpression>
+					</textField>
+					<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+						<reportElement x="0" y="0" width="130" height="30" uuid="c4953041-4676-4701-9830-4ad98d6ac9a2"/>
+						<textElement textAlignment="Center" verticalAlignment="Middle"/>
+						<textFieldExpression><![CDATA[$F{productCode}]]></textFieldExpression>
+					</textField>
+				</frame>
+			</band>
+		</groupHeader>
+	</group>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<title>
+		<band height="90" splitType="Stretch">
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<staticText>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="0" width="200" height="30" uuid="bc3874ea-c0b6-4870-bb5d-b63fd3314fee"/>
+				<textElement>
+					<font size="24"/>
+				</textElement>
+				<text><![CDATA[Lista de selección y empaque]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement x="0" y="30" width="480" height="60" uuid="d367a730-0ee3-4190-bebd-9ea69213caba">
+					<property name="com.jaspersoft.studio.layout" value="com.jaspersoft.studio.editor.layout.VerticalRowLayout"/>
+					<property name="com.jaspersoft.studio.table.style.table_header" value="Table_TH"/>
+					<property name="com.jaspersoft.studio.table.style.column_header" value="Table_CH"/>
+					<property name="com.jaspersoft.studio.table.style.detail" value="Table_TD"/>
+				</reportElement>
+				<jr:table xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd">
+					<datasetRun subDataset="OrderDataset" uuid="26940bc1-2e1e-424c-9a9b-e03754bb12bb">
+						<datasetParameter name="shipmentDraftId">
+							<datasetParameterExpression><![CDATA[$P{shipmentDraftId}]]></datasetParameterExpression>
+						</datasetParameter>
+						<datasetParameter name="dateFormat">
+							<datasetParameterExpression><![CDATA[$P{dateFormat}]]></datasetParameterExpression>
+						</datasetParameter>
+						<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+					</datasetRun>
+					<jr:column width="480" uuid="23073e37-411c-4b58-856e-3dfd8d3c6234">
+						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column1"/>
+						<jr:detailCell style="Table_TD" height="60">
+							<textField>
+								<reportElement x="0" y="0" width="480" height="15" uuid="03004ca1-4080-437a-a66d-097b681ed43f"/>
+								<textFieldExpression><![CDATA["Generado el: " + DateTimeFormatter.ofPattern($P{dateFormat}).format(LocalDate.now())]]></textFieldExpression>
+							</textField>
+							<textField>
+								<reportElement x="0" y="15" width="480" height="15" uuid="cf02560e-c75a-4247-beb5-c6e45e390591"/>
+								<textFieldExpression><![CDATA["Orden: " + $F{orderCode}]]></textFieldExpression>
+							</textField>
+							<textField>
+								<reportElement x="0" y="30" width="480" height="15" uuid="ce8e20c0-6591-44a4-80ac-ecbcffef673e"/>
+								<textFieldExpression><![CDATA["Establecimiento: " + $F{requestingFacilityName}]]></textFieldExpression>
+							</textField>
+							<textField>
+								<reportElement positionType="FixRelativeToBottom" x="0" y="45" width="480" height="15" uuid="17b6fb59-a1ea-443c-8ca8-66944b0d4b49"/>
+								<textFieldExpression><![CDATA["Bodega: " + $F{supplyingFacilityName}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+				</jr:table>
+			</componentElement>
+		</band>
+	</title>
+	<columnHeader>
+		<band height="30">
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<staticText>
+				<reportElement mode="Opaque" x="677" y="0" width="125" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="494ee087-80f1-48ab-94c5-b20eb68dacc3">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4" rightPadding="5">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Cantidad a despachar (viales)]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="380" y="0" width="80" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="1d0f90c8-155c-4c5a-a3b3-1757664bad2b">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Estado VVM]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="460" y="0" width="90" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="874da496-6ece-4412-869f-131d08ed08a5">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Fecha de vencimiento]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="0" y="0" width="130" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="24a43dc9-a045-479a-8e5b-7cd5b615b534">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Código de producto]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="130" y="0" width="150" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="75c35809-06f2-4d1c-8e67-eaff6ef07168">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Producto]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="280" y="0" width="100" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="13cf66f1-9701-4387-9dbe-c96979344f27">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Código de lote]]></text>
+			</staticText>
+			<staticText>
+				<reportElement mode="Opaque" x="550" y="0" width="127" height="30" forecolor="#FFFFFF" backcolor="#3D3D3D" uuid="a36a87dd-dbda-4f2e-a6e4-c5dc45b8aabd">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="4">
+					<pen lineWidth="1.0" lineColor="#DDDDDD"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Cantidad a despachar (dosis)]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="30" splitType="Stretch">
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<frame>
+				<reportElement x="0" y="0" width="802" height="30" uuid="70f42c71-ab05-4e39-8677-838a32c5e8e3"/>
+				<box>
+					<bottomPen lineWidth="0.5"/>
+				</box>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="677" y="0" width="125" height="30" isRemoveLineWhenBlank="true" uuid="0c1d0af5-6283-4b1c-85dc-2ad9b1c51f4d"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[$P{decimalFormat}.format($F{filledQuantity}).toString()]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="460" y="0" width="90" height="30" isRemoveLineWhenBlank="true" uuid="917b7f62-622f-4619-9c0b-680009d1681f"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[DateTimeFormatter.ofPattern($P{dateFormat}).format(LocalDate.parse($F{expirationDate}))]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="380" y="0" width="80" height="30" isRemoveLineWhenBlank="true" uuid="014431ee-6970-4028-8824-8a25ffff1945"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[$F{vvmStatus}]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="550" y="0" width="127" height="30" isRemoveLineWhenBlank="true" uuid="df186412-f2f2-4679-9b34-35f91f391307"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[$P{decimalFormat}.format($V{filledQuantityDoses}).toString()]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="280" y="0" width="100" height="30" isRemoveLineWhenBlank="true" uuid="56b32764-1ae0-4254-9464-5ed16a874f0d"/>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[($F{lotCode} == null) ? "Sin lote" : $F{lotCode}]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="130" y="0" width="150" height="30" isRemoveLineWhenBlank="true" uuid="77d9da27-b8cf-4dc7-b8a0-f98f383d347c">
+						<printWhenExpression><![CDATA[$F{lotCode} == null]]></printWhenExpression>
+					</reportElement>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[$F{productName}]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="0" y="0" width="130" height="30" isRemoveLineWhenBlank="true" uuid="ee99fd26-a2f5-4ae5-8ed0-a9a17a83bbcf">
+						<printWhenExpression><![CDATA[$F{lotCode} == null]]></printWhenExpression>
+					</reportElement>
+					<textElement textAlignment="Center" verticalAlignment="Middle"/>
+					<textFieldExpression><![CDATA[$F{productCode}]]></textFieldExpression>
+				</textField>
+			</frame>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="30" splitType="Stretch">
+			<staticText>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="0" width="360" height="30" uuid="bbf79fc6-3369-11e8-b467-0ed5f89f718b"/>
+				<text><![CDATA[Solo se muestran los productos con cantidad a despachar mayor que cero.]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="660" y="10" width="70" height="20" uuid="49d7030b-3cad-47e5-af05-f063c98fb9e4"/>
+				<textElement textAlignment="Right" verticalAlignment="Bottom"/>
+				<textFieldExpression><![CDATA["Pág. " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="732" y="10" width="50" height="20" uuid="08848fb7-8d78-4e93-a448-483ebae4c582"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom"/>
+				<textFieldExpression><![CDATA[" de " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+</jasperReport>

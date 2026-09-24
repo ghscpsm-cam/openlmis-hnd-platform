@@ -28,6 +28,8 @@ services:
     cpus: "${REFERENCEDATA_CPUS:-2}"
   stockmanagement:
     <<: *host-alias
+    # Imagen oficial con la Tarjeta de Almacén, el resumen de existencias y el inventario físico en español.
+    image: "${STOCKMANAGEMENT_IMAGE:-openlmis/stockmanagement:5.3.0}"
     restart: unless-stopped
     environment:
       JAVA_OPTS: "-server -Xmx${STOCKMANAGEMENT_XMX:-1536m} -Dlogging.config=/config/log/logback.xml"

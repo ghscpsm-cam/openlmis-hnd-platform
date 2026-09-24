@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.20.5.final using JasperReports Library version 6.20.5-3efcf2e67f959db3888d79f73dde2dbd7acb4f8e  -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="CoreStockOnHand" pageWidth="842" pageHeight="595" orientation="Landscape" whenNoDataType="AllSectionsNoDetail" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" isFloatColumnFooter="true" uuid="1fd4208c-6840-4925-a1f6-5770e8fb3e97">
+	<property name="net.sf.jasperreports.export.xlsx.exclude.origin.band.1" value="pageHeader"/>
+	<property name="net.sf.jasperreports.export.xlsx.exclude.origin.band.2" value="pageFooter"/>
+	<property name="net.sf.jasperreports.export.xlsx.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.xlsx.remove.empty.space.between.rows" value="true"/>
+	<property name="net.sf.jasperreports.export.xlsx.exclude.key.PaginationText"/>
+	<property name="net.sf.jasperreports.export.xls.exclude.origin.band.1" value="pageHeader"/>
+	<property name="net.sf.jasperreports.export.xls.exclude.origin.band.2" value="pageFooter"/>
+	<property name="net.sf.jasperreports.export.xls.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.xls.remove.empty.space.between.rows" value="true"/>
+	<property name="net.sf.jasperreports.export.xls.exclude.key.PaginationText"/>
+	<property name="net.sf.jasperreports.export.csv.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.csv.exclude.origin.band.1" value="pageHeader"/>
+	<property name="net.sf.jasperreports.export.csv.exclude.origin.band.2" value="pageFooter"/>
+	<property name="net.sf.jasperreports.export.csv.exclude.key.PaginationText"/>
+	<style name="MarkedExpiredProductDate" forecolor="#000000" pattern="">
+		<conditionalStyle>
+			<conditionExpression><![CDATA[($F{productExpiryDate} != null && new SimpleDateFormat("yyyy-MM-dd").parse($F{productExpiryDate}).before(new SimpleDateFormat("yyyy-MM-dd").parse($P{date}))) && $P{expiredProducts} == null]]></conditionExpression>
+			<style forecolor="#E30805"/>
+		</conditionalStyle>
+	</style>
+	<parameter name="date" class="java.lang.String">
+		<property name="displayName" value="Fecha"/>
+		<property name="required" value="true"/>
+	</parameter>
+	<parameter name="expiredProducts" class="java.lang.String" nestedType="java.lang.String">
+		<property name="displayName" value="Productos vencidos"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="facilityType" class="java.lang.String" nestedType="java.lang.String">
+		<property name="displayName" value="Tipo de establecimiento"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="facility" class="java.lang.String" nestedType="java.lang.String">
+		<property name="displayName" value="Establecimiento"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="timeZone" class="java.lang.String" isForPrompting="false">
+		<property name="displayName" value="Zona horaria"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="geographicZone" class="java.lang.String" nestedType="java.lang.String">
+		<property name="displayName" value="Zona geográfica"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="product" class="java.lang.String" nestedType="java.lang.String">
+		<property name="displayName" value="Producto"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="program" class="java.lang.String" nestedType="java.lang.String">
+		<property name="displayName" value="Programa"/>
+		<property name="required" value="false"/>
+	</parameter>
+	<parameter name="userId" class="java.lang.String">
+		<property name="displayName" value="Delete from template parameters"/>
+	</parameter>
+	<queryString>
+		<![CDATA[WITH RECURSIVE findChildZones AS (
+  SELECT * FROM referencedata.geographic_zones WHERE name = $P{geographicZone}::varchar
+  UNION ALL
+  SELECT referencedata.geographic_zones.* FROM referencedata.geographic_zones 
+  JOIN findChildZones ON findChildZones.id = referencedata.geographic_zones.parentId
+),
+latest_orderable_identifiers AS (
+  SELECT DISTINCT ON (orderableid) *
+  FROM referencedata.orderable_identifiers
+  WHERE "key" = 'tradeItem'
+  ORDER BY orderableid, orderableversionnumber DESC
+),
+user_rights as (
+  select facilityid, programid, userid from referencedata.right_assignments ra 
+  where ra.rightname = 'STOCK_CARDS_VIEW' and ra.userId = $P{userId}::uuid
+)
+SELECT
+  soh_data.facilityName AS facilityName,
+  soh_data.facilityId AS facilitId,
+  soh_data.productId AS productId,
+  soh_data.productName AS productName,
+  soh_data.productLotCode AS productLotCode,
+  soh_data.productExpiryDate AS productExpiryDate,
+  soh_data.lastUpdated AS lastUpdated,
+  SUM(soh_data.stockonhand) AS quantity,
+  soh_data.monthsToExpire AS monthsToExpire,
+  soh_data.netContent AS netContent,
+  COALESCE(trade_items.manufactureroftradeitem, 'no data') AS supplier,
+  COALESCE(vialStage.extradata->>'vvmStatus', 'no data') AS vialStage,
+  soh_data.district AS district,
+  soh_data.facilityType AS facilityType,
+  soh_data.programId AS programId,
+  programs.name AS programName
+FROM (
+  SELECT
+    products.code AS productId,
+    products.fullproductname AS productName,
+    lots.lotcode AS productLotCode,
+    lots.expirationdate AS productExpiryDate,
+    soh.stockonhand AS stockonhand,
+    facilities."name" AS facilityName,
+    facilities.id as facilityId,
+    soh.occurreddate AS lastUpdated,
+    products.netcontent AS netContent,
+    stock_cards.programid AS programId,
+    CASE
+      WHEN lots.id IS NOT NULL THEN (
+        EXTRACT(YEAR FROM age(lots.expirationdate, NOW())) * 12 + 
+        EXTRACT(MONTH FROM age(lots.expirationdate, NOW())) + 
+        (EXTRACT(DAY FROM age(lots.expirationdate, NOW())) / 30)
+      )::numeric
+      ELSE 0
+    END AS monthsToExpire,
+    RANK() OVER (PARTITION BY products.id ORDER BY products.versionnumber DESC) AS product_version_rank,
+    MAX(soh.occurreddate) AS max_date,
+    stock_cards.orderableid AS orderableid,
+    stock_cards.id AS stock_card_id,
+    zones.name AS district,
+    facilities_types.name AS facilityType
+  FROM
+    stockmanagement.stock_cards AS stock_cards
+    JOIN stockmanagement.calculated_stocks_on_hand AS soh ON soh.stockcardid = stock_cards.id
+    JOIN (
+      SELECT
+        stockcardid,
+        MAX(occurreddate) AS max_date
+      FROM
+        stockmanagement.calculated_stocks_on_hand
+      WHERE
+        occurreddate::varchar <= $P{date}::varchar
+      GROUP BY
+        stockcardid
+    ) AS cs ON cs.stockcardid = soh.stockcardid AND cs.max_date = soh.occurreddate
+    JOIN referencedata.orderables AS products ON products.id = stock_cards.orderableid
+    LEFT JOIN referencedata.lots AS lots ON lots.id = stock_cards.lotid
+    JOIN referencedata.facilities AS facilities ON facilities.id = stock_cards.facilityid
+    JOIN referencedata.facility_types AS facilities_types ON facilities_types.id = facilities.typeid
+    JOIN referencedata.geographic_zones AS zones ON zones.id = facilities.geographiczoneid
+  WHERE
+    (facilities.name = $P{facility} OR $P{facility} IS NULL)
+    AND (facilities_types.name = $P{facilityType} OR $P{facilityType} IS NULL)
+    AND (products.fullproductname = $P{product} OR $P{product} IS NULL)
+    AND (($P{expiredProducts} = 'true' AND lots.expirationdate < $P{date}::date) OR
+          ($P{expiredProducts} = 'false' AND lots.expirationdate >= $P{date}::date) OR
+          $P{expiredProducts} IS NULL)
+    AND (zones.id IN (SELECT id FROM findChildZones) OR $P{geographicZone} IS NULL)
+  GROUP BY
+    products.code,
+    products.fullproductname,
+    lots.lotcode,
+    lots.expirationdate,
+    soh.stockonhand,
+    facilities."name",
+    soh.occurreddate,
+    zones.name,
+    products.versionnumber,
+    products.id,
+    products.netcontent,
+    lots.id,
+    stock_cards.orderableid,
+    stock_cards.id,
+    facilities_types.name,
+    stock_cards.programid,
+    facilities.id
+) AS soh_data
+LEFT JOIN latest_orderable_identifiers AS orderable_identifiers ON soh_data.orderableid = orderable_identifiers.orderableid
+LEFT JOIN referencedata.trade_items AS trade_items ON orderable_identifiers.value = trade_items.id::varchar
+LEFT JOIN (
+  SELECT DISTINCT ON (stockcardid) *
+  FROM stockmanagement.stock_card_line_items
+  WHERE occurreddate <= $P{date}::date
+  ORDER BY stockcardid, occurreddate DESC
+) AS vialStage ON soh_data.stock_card_id = vialStage.stockcardid
+LEFT JOIN referencedata.programs AS programs ON soh_data.programId = programs.id
+JOIN user_rights ur
+    ON soh_data.programid = ur.programid
+    and soh_data.facilityid = ur.facilityid 
+WHERE
+  soh_data.product_version_rank = 1
+  AND (programs.name = $P{program} OR $P{program} IS NULL)
+GROUP BY
+  soh_data.facilityName,
+  soh_data.productName,
+  soh_data.productLotCode,
+  soh_data.productExpiryDate,
+  soh_data.productId,
+  soh_data.lastUpdated,
+  soh_data.monthsToExpire,
+  soh_data.netContent,
+  trade_items.manufactureroftradeitem,
+  vialStage.extradata->>'vvmStatus',
+  soh_data.district,
+  soh_data.facilityType,
+  soh_data.programId,
+  programs.name,
+  soh_data.facilityid;]]>
+	</queryString>
+	<field name="facilityName" class="java.lang.String"/>
+	<field name="productId" class="java.lang.String"/>
+	<field name="productName" class="java.lang.String"/>
+	<field name="productLotCode" class="java.lang.String"/>
+	<field name="productExpiryDate" class="java.lang.String"/>
+	<field name="lastUpdated" class="java.lang.String"/>
+	<field name="quantity" class="java.lang.Long"/>
+	<field name="netContent" class="java.lang.Long"/>
+	<field name="monthsToExpire" class="java.lang.Double"/>
+	<field name="supplier" class="java.lang.String"/>
+	<field name="vialStage" class="java.lang.String"/>
+	<field name="district" class="java.lang.String"/>
+	<field name="facilityType" class="java.lang.String"/>
+	<field name="programName" class="java.lang.String"/>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<title>
+		<band height="2" splitType="Stretch"/>
+	</title>
+	<pageHeader>
+		<band height="150" splitType="Stretch">
+			<printWhenExpression><![CDATA[new Boolean($V{PAGE_NUMBER}.intValue()==1)]]></printWhenExpression>
+			<textField>
+				<reportElement x="0" y="80" width="230" height="20" uuid="c99c8f1c-d3d3-4020-8541-2da7e1a48466"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{geographicZone} != null ? "Zona geográfica" : ($P{facilityType} != null ? "Tipo de establecimiento" : "Establecimiento")]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="432" y="80" width="208" height="20" uuid="48e7b132-74de-44e8-9a1f-5ab8e86adeb5"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Fecha de existencias:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement key="" x="640" y="80" width="161" height="20" uuid="4b505859-702c-4523-b9ee-567234bef054">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Fecha del reporte:]]></text>
+			</staticText>
+			<rectangle>
+				<reportElement x="0" y="53" width="801" height="27" backcolor="#C0C0C0" uuid="1d9034c0-77df-4000-920e-06594b2ebeb6">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<graphicElement>
+					<pen lineWidth="0.0"/>
+				</graphicElement>
+			</rectangle>
+			<staticText>
+				<reportElement x="0" y="53" width="801" height="28" forecolor="#FFFFFF" uuid="105ff9af-17db-4b74-a575-9ce26c6cc21f"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="24" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Existencia en mano]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="0" y="100" width="230" height="20" uuid="a8565621-bd19-4b76-bd5e-280c405039c6"/>
+				<textFieldExpression><![CDATA[$P{geographicZone} != null ? $P{geographicZone} :
+    				($P{facilityType} != null ? $P{facilityType} :
+    				($P{facility} != null ? $P{facility} : "All"))]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="432" y="100" width="208" height="20" uuid="36f32e3f-b43e-458c-8724-9ea5571e0369"/>
+				<textFieldExpression><![CDATA[$P{date}]]></textFieldExpression>
+			</textField>
+			<textField pattern="dd/MM/yyyy">
+				<reportElement x="640" y="100" width="161" height="20" uuid="1a79bec9-bcf9-40b7-9530-86290dcd415f"/>
+				<textFieldExpression><![CDATA[new SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date())]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="230" y="80" width="202" height="20" uuid="dca5e26f-c56e-4405-b824-e7f5516e0a7e"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Programa]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="230" y="100" width="202" height="20" uuid="c88caf12-452e-4beb-846a-faadd85f251e"/>
+				<textFieldExpression><![CDATA[$P{program} != null ? $P{program} : "All"]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<columnHeader>
+		<band height="30" splitType="Stretch">
+			<rectangle>
+				<reportElement x="0" y="0" width="801" height="30" backcolor="#C0C0C0" uuid="5ef622da-a8e3-4110-ba9e-b2b9f14d8eaa">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<graphicElement>
+					<pen lineWidth="0.0"/>
+				</graphicElement>
+			</rectangle>
+			<staticText>
+				<reportElement x="0" y="0" width="80" height="30" uuid="c9afe000-7909-4d5c-9026-f51a2676c8a9"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Establecimiento]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="320" y="0" width="70" height="30" uuid="74a64681-460b-4be8-b151-be5f9cf70633"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Código de producto]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="80" y="0" width="79" height="30" uuid="1def4702-0616-429b-b5aa-b5f1778dfc86"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Zona geográfica]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="159" y="0" width="81" height="30" uuid="d66daf14-80ce-4234-bf97-bddbb62b902b"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Tipo de establecimiento]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="240" y="0" width="80" height="30" uuid="db05e5bd-2535-4de6-85ad-1952eed636dd"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Producto]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="500" y="0" width="80" height="30" uuid="4cd2a7bb-4661-496c-935b-5027dea9f202"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Proveedor]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="390" y="0" width="48" height="30" uuid="4cd2a7bb-4661-496c-935b-5027dea9f202"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Código de lote]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="438" y="0" width="62" height="30" uuid="4cd2a7bb-4661-496c-935b-5027dea9f202"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Programa]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="580" y="0" width="60" height="30" uuid="df0df775-dc98-42ef-8365-953232c5ce03"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Fecha de vencimiento]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="640" y="0" width="60" height="30" uuid="1a7908df-eb69-4140-8744-5b4d49d71352"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Existencia disponible]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="700" y="0" width="51" height="30" uuid="5f86cae2-0c1c-452f-b9da-9d53d849656a"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Contenido neto]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="751" y="0" width="50" height="30" uuid="5f86cae2-0c1c-452f-b9da-9d53d849656a"/>
+				<box leftPadding="2" bottomPadding="1">
+					<pen lineWidth="1.0" lineColor="#80C7E8"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="true"/>
+				</textElement>
+				<text><![CDATA[Estado VVM]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="46" splitType="Prevent">
+			<property name="com.jaspersoft.studio.layout"/>
+			<rectangle>
+				<reportElement stretchType="RelativeToBandHeight" x="0" y="0" width="801" height="45" backcolor="#F0F0F0" uuid="2de367b0-e3ff-42e2-b474-e9accdcd1c69"/>
+				<graphicElement>
+					<pen lineWidth="0.0"/>
+				</graphicElement>
+			</rectangle>
+			<textField isBlankWhenNull="true">
+				<reportElement x="0" y="0" width="80" height="45" uuid="22c747ca-ce9b-42ff-883b-ba6d9bcce6c2"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{facilityName}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="320" y="0" width="70" height="45" uuid="18e7a1cd-a945-4fb7-803f-97fccd8c2256"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{productId}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="80" y="0" width="79" height="45" uuid="158b0d96-0c90-48a4-87de-36d2380266af"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{district}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="159" y="0" width="81" height="45" uuid="fd442db8-d9e9-4693-a7b4-e1d3fc0a2773"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{facilityType}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="240" y="0" width="80" height="45" uuid="ab42938c-4f7b-46c9-bf11-f7b13edd26c9"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{productName}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="500" y="0" width="80" height="45" uuid="78e963fe-1d67-4d4f-b70b-6005eaabf0dc"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{supplier}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="390" y="0" width="48" height="45" uuid="78e963fe-1d67-4d4f-b70b-6005eaabf0dc"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{productLotCode}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="438" y="0" width="62" height="45" uuid="78e963fe-1d67-4d4f-b70b-6005eaabf0dc"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{programName}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement style="MarkedExpiredProductDate" x="580" y="0" width="60" height="45" uuid="5008306e-d65e-4e8f-b915-f7a3aa7d9328"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{productExpiryDate}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="640" y="0" width="60" height="45" uuid="484c46c2-05e8-461f-8d10-d36048f6e909"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{quantity}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="700" y="0" width="51" height="45" uuid="6f4f2b9e-2e7a-4aca-a686-4f4d9bd6af5d"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{netContent}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="751" y="0" width="50" height="45" uuid="6f4f2b9e-2e7a-4aca-a686-4f4d9bd6af5d"/>
+				<box>
+					<pen lineWidth="0.25" lineColor="#D2D2D2"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font isBold="false"/>
+					<paragraph lineSpacing="1_1_2"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{vialStage}.startsWith("STAGE_") ? "VVM" + $F{vialStage}.substring(6) : $F{vialStage}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="40">
+			<textField evaluationTime="Master">
+				<reportElement x="701" y="3" width="100" height="30" uuid="f1db7f67-876a-48ce-a6d2-2fdf4b475085"/>
+				<textElement textAlignment="Right" verticalAlignment="Top"/>
+				<textFieldExpression><![CDATA["Pág. " + $V{MASTER_CURRENT_PAGE} + " de " + $V{MASTER_TOTAL_PAGES}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+	<summary>
+		<band height="52">
+			<staticText>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="0" width="800" height="51" uuid="d5ac5426-34dd-41c4-acde-4510f82e3add">
+					<printWhenExpression><![CDATA[new Boolean($V{REPORT_COUNT}.intValue()==0)]]></printWhenExpression>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="12" isBold="true"/>
+				</textElement>
+				<text><![CDATA[No hay datos para los parámetros indicados.]]></text>
+			</staticText>
+		</band>
+	</summary>
+</jasperReport>

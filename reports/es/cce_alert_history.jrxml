@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.5.1.final using JasperReports Library version 6.5.1  -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="CceAlertHistory" pageWidth="842" pageHeight="595" whenNoDataType="AllSectionsNoDetail" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="be52f660-1499-4fdb-bac0-fa964fc1e938">
+	<property name="net.sf.jasperreports.export.xls.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.csv.exclude.origin.keep.first.band.1" value="columnHeader"/>
+	<property name="net.sf.jasperreports.export.xls.one.page.per.sheet" value="false"/>
+	<property name="net.sf.jasperreports.export.csv.one.page.per.sheet" value="false"/>
+	<property name="net.sf.jasperreports.export.xls.remove.empty.space.between.rows" value="true"/>
+	<property name="net.sf.jasperreports.export.csv.remove.empty.space.between.rows" value="true"/>
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="OpenLMIS v3"/>
+	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w1" value="337"/>
+	<property name="com.jaspersoft.studio.data.sql.SQLQueryDesigner.sash.w2" value="654"/>
+	<property name="com.jaspersoft.studio.property.dataset.dialog.DatasetDialog.sash.w1" value="781"/>
+	<property name="com.jaspersoft.studio.property.dataset.dialog.DatasetDialog.sash.w2" value="209"/>
+	<import value="java.time.ZonedDateTime"/>
+	<import value="java.time.format.DateTimeFormatter"/>
+	<style name="Table_CH" mode="Opaque" backcolor="#333333">
+		<box>
+			<topPen lineWidth="0.5" lineColor="#000000"/>
+			<bottomPen lineWidth="0.5" lineColor="#000000"/>
+		</box>
+	</style>
+	<style name="Table_TD" mode="Opaque" backcolor="#FFFFFF">
+		<box>
+			<topPen lineWidth="0.5" lineColor="#000000"/>
+			<bottomPen lineWidth="0.5" lineColor="#000000"/>
+		</box>
+	</style>
+	<subDataset name="ItemDataSource" uuid="2914f7c6-c2d7-448b-b0c1-090970e18ed6">
+		<parameter name="inventoryItemId" class="java.lang.String"/>
+		<parameter name="dateTimeFormat" class="java.lang.String" isForPrompting="false"/>
+		<parameter name="timeZoneId" class="java.lang.String" isForPrompting="false"/>
+		<queryString language="plsql">
+			<![CDATA[SELECT
+    CASE ca.active
+         WHEN TRUE THEN 'yes'
+         ELSE 'no'
+    END AS active
+    , casm.message
+    , to_char(ca.starttimestamp, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS dateStarted
+    , to_char(ca.endtimestamp, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS dateEnded
+    , to_char(ca.dismisstimestamp, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS dateDismissed
+FROM cce.cce_alerts ca
+    LEFT JOIN cce.cce_alert_status_messages casm ON casm.alertid = ca.id AND casm.locale = 'en-US'
+WHERE ca.starttimestamp > NOW() - INTERVAL '30 DAYS'
+    AND ca.inventoryitemid = $P{inventoryItemId}::uuid
+ORDER BY ca.active DESC
+    , ca.starttimestamp DESC]]>
+		</queryString>
+		<field name="active" class="java.lang.String"/>
+		<field name="message" class="java.lang.String"/>
+		<field name="dateStarted" class="java.lang.String"/>
+		<field name="dateEnded" class="java.lang.String"/>
+		<field name="dateDismissed" class="java.lang.String"/>
+	</subDataset>
+	<parameter name="inventoryItemId" class="java.lang.String">
+		<property name="displayName" value="ID del equipo"/>
+	</parameter>
+	<parameter name="dateTimeFormat" class="java.lang.String" isForPrompting="false"/>
+	<parameter name="timeZoneId" class="java.lang.String" isForPrompting="false"/>
+	<queryString language="plsql">
+		<![CDATA[SELECT
+    cii.referencename AS inventoryItemReferenceName
+    , f.name AS facilityName
+    , p.name AS programName
+FROM cce.cce_inventory_items cii
+	LEFT JOIN referencedata.facilities f ON f.id = cii.facilityid
+    LEFT JOIN referencedata.programs p ON p.id = cii.programid
+WHERE cii.id = $P{inventoryItemId}::uuid]]>
+	</queryString>
+	<field name="inventoryItemReferenceName" class="java.lang.String"/>
+	<field name="facilityName" class="java.lang.String"/>
+	<field name="programName" class="java.lang.String"/>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<title>
+		<band height="90" splitType="Stretch">
+			<staticText>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="0" width="802" height="30" uuid="bc3874ea-c0b6-4870-bb5d-b63fd3314fee"/>
+				<textElement textAlignment="Center">
+					<font size="24"/>
+				</textElement>
+				<text><![CDATA[Alertas de monitoreo remoto de temperatura de los últimos 30 días]]></text>
+			</staticText>
+			<textField>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="30" width="400" height="15" uuid="6603b7c0-88ee-4ed5-8ab7-8ce1525ab34a"/>
+				<textFieldExpression><![CDATA["Equipo: " + $F{inventoryItemReferenceName}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="45" width="400" height="15" uuid="391255e0-1e46-4c5f-8f5c-44d3476acd5b"/>
+				<textFieldExpression><![CDATA["Establecimiento: " + $F{facilityName}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="60" width="400" height="15" uuid="8f145179-c938-4a8f-87f2-6ea47071508f"/>
+				<textFieldExpression><![CDATA["Programa: " + $F{programName}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement positionType="FixRelativeToBottom" x="0" y="75" width="400" height="15" uuid="7e71222a-5f8f-4569-a08a-c9a0d4baa75f"/>
+				<textFieldExpression><![CDATA["Generado el: " + DateTimeFormatter.ofPattern($P{dateTimeFormat}).format(ZonedDateTime.now()) + " " + $P{timeZoneId}]]></textFieldExpression>
+			</textField>
+		</band>
+	</title>
+	<detail>
+		<band height="234" splitType="Stretch">
+			<componentElement>
+				<reportElement x="0" y="0" width="802" height="230" uuid="3ed81775-a15d-46ea-a953-96bc2e7f9925">
+					<property name="com.jaspersoft.studio.layout" value="com.jaspersoft.studio.editor.layout.VerticalRowLayout"/>
+					<property name="com.jaspersoft.studio.table.style.table_header" value="Table_TH"/>
+					<property name="com.jaspersoft.studio.table.style.column_header" value="Table_CH"/>
+					<property name="com.jaspersoft.studio.table.style.detail" value="Table_TD"/>
+					<property name="net.sf.jasperreports.export.headertoolbar.table.name" value=""/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+					<property name="com.jaspersoft.studio.components.autoresize.next" value="true"/>
+					<property name="com.jaspersoft.studio.components.autoresize.proportional" value="true"/>
+				</reportElement>
+				<jr:table xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" whenNoDataType="AllSectionsNoDetail">
+					<datasetRun subDataset="ItemDataSource" uuid="3e3c813d-4f5d-4b71-9c92-88b7dbe5ff4c">
+						<datasetParameter name="inventoryItemId">
+							<datasetParameterExpression><![CDATA[$P{inventoryItemId}]]></datasetParameterExpression>
+						</datasetParameter>
+						<datasetParameter name="ORACLE_REF_CURSOR">
+							<datasetParameterExpression><![CDATA[$P{ORACLE_REF_CURSOR}]]></datasetParameterExpression>
+						</datasetParameter>
+						<datasetParameter name="dateTimeFormat">
+							<datasetParameterExpression><![CDATA[$P{dateTimeFormat}]]></datasetParameterExpression>
+						</datasetParameter>
+						<datasetParameter name="timeZoneId">
+							<datasetParameterExpression><![CDATA[$P{timeZoneId}]]></datasetParameterExpression>
+						</datasetParameter>
+						<connectionExpression><![CDATA[$P{REPORT_CONNECTION}]]></connectionExpression>
+					</datasetRun>
+					<jr:column width="50" uuid="97f20a4a-9dcc-4984-a340-acd2062c348f">
+						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column1"/>
+						<jr:columnHeader style="Table_CH" height="30" rowSpan="1">
+							<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+							<staticText>
+								<reportElement x="0" y="0" width="50" height="30" forecolor="#FFFFFF" backcolor="#000000" uuid="5d0efb1b-aa11-497b-96d3-4996a162ee44"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[¿Activa?]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:detailCell style="Table_TD" height="30">
+							<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+								<reportElement x="0" y="0" width="50" height="30" uuid="fd8b35bc-d736-4e82-b559-d86e9d933681"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[$F{active}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+					<jr:column width="302" uuid="7ee4e17a-ab48-4493-b9c3-497b7966888c">
+						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column2"/>
+						<jr:columnHeader style="Table_CH" height="30" rowSpan="1">
+							<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+							<staticText>
+								<reportElement x="0" y="0" width="302" height="30" forecolor="#FFFFFF" backcolor="#000000" uuid="667ec2de-e77a-4213-9f11-f475da2ad346"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[Mensaje]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:detailCell style="Table_TD" height="30">
+							<textField isBlankWhenNull="true">
+								<reportElement x="0" y="0" width="302" height="30" uuid="10f47bcc-8ace-4804-89c5-04dfe4053ebd"/>
+								<textElement textAlignment="Left" verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[$F{message}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+					<jr:column width="150" uuid="7f8193c8-7367-4c12-8bb1-b6619cbc0b16">
+						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column3"/>
+						<jr:columnHeader style="Table_CH" height="30" rowSpan="1">
+							<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+							<staticText>
+								<reportElement x="0" y="0" width="150" height="30" forecolor="#FFFFFF" backcolor="#000000" uuid="cadefb93-93d7-4b2e-8b9a-62b4f2b1bf16"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[Fecha de inicio]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:detailCell style="Table_TD" height="30">
+							<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+								<reportElement x="0" y="0" width="150" height="30" uuid="dea55055-579f-4a6a-9f37-139785c085bf"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[DateTimeFormatter.ofPattern($P{dateTimeFormat}).format(ZonedDateTime.parse($F{dateStarted})) + " " + $P{timeZoneId}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+					<jr:column width="150" uuid="98f61f55-b615-4a1c-b204-bc4e69525227">
+						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column4"/>
+						<jr:columnHeader style="Table_CH" height="30" rowSpan="1">
+							<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+							<staticText>
+								<reportElement x="0" y="0" width="150" height="30" forecolor="#FFFFFF" backcolor="#000000" uuid="b722ec2b-7798-4553-ad19-d2ead3109a6b"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[Fecha de fin]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:detailCell style="Table_TD" height="30">
+							<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+								<reportElement x="0" y="0" width="150" height="30" uuid="a5963f2f-d12f-4ad7-9ad4-8fd54205754b"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[DateTimeFormatter.ofPattern($P{dateTimeFormat}).format(ZonedDateTime.parse($F{dateEnded})) + " " + $P{timeZoneId}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+					<jr:column width="150" uuid="a34c8f74-167d-4f4d-bd4e-8d23c3470550">
+						<property name="com.jaspersoft.studio.components.table.model.column.name" value="Column5"/>
+						<jr:columnHeader style="Table_CH" height="30" rowSpan="1">
+							<staticText>
+								<reportElement x="0" y="0" width="150" height="30" forecolor="#FFFFFF" backcolor="#000000" uuid="94a27e13-856c-4419-aa8e-1f6ff0c4eab4"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle">
+									<font isBold="true"/>
+								</textElement>
+								<text><![CDATA[Fecha de descarte]]></text>
+							</staticText>
+						</jr:columnHeader>
+						<jr:detailCell style="Table_TD" height="30">
+							<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+								<reportElement x="0" y="0" width="150" height="30" uuid="b02df90b-8663-4fe7-a569-0c67c75a8f51"/>
+								<textElement textAlignment="Center" verticalAlignment="Middle"/>
+								<textFieldExpression><![CDATA[DateTimeFormatter.ofPattern($P{dateTimeFormat}).format(ZonedDateTime.parse($F{dateDismissed})) + " " + $P{timeZoneId}]]></textFieldExpression>
+							</textField>
+						</jr:detailCell>
+					</jr:column>
+				</jr:table>
+			</componentElement>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="30" splitType="Stretch">
+			<textField>
+				<reportElement x="330" y="10" width="70" height="20" uuid="49d7030b-3cad-47e5-af05-f063c98fb9e4"/>
+				<textElement textAlignment="Right" verticalAlignment="Bottom"/>
+				<textFieldExpression><![CDATA["Pág. " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="400" y="10" width="50" height="20" uuid="08848fb7-8d78-4e93-a448-483ebae4c582"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom"/>
+				<textFieldExpression><![CDATA[" de " + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+</jasperReport>
