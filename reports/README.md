@@ -14,7 +14,7 @@ selección y empaque por el ID fijo `583ccc35-...`, y subirlas por la API
 (`/api/reports/templates/common`) las recrea con un ID nuevo.
 
 Las plantillas de la Tarjeta de Almacén, el resumen de existencias y las líneas del inventario
-físico van dentro de la imagen `openlmis-hnd-stockmanagement` (repo de stockmanagement de Honduras).
+físico van dentro de la imagen `openlmis-hnd-stockmanagement`, que se construye en el servidor desde `images/stockmanagement/`.
 
 ## Regenerar el db-fix después de cambiar un .jrxml
 
